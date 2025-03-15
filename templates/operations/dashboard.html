@@ -1,0 +1,701 @@
+{% extends 'base.html' %}
+{% load operations_tags %}
+
+{% block title %}Operations Dashboard - RMHS{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f5f5f5;
+    }
+    .dashboard-card {
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .summary-card {
+        height: 100%;
+        transition: transform 0.3s;
+    }
+    .summary-card:hover {
+        transform: translateY(-5px);
+    }
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid rgba(0,0,0,0.125);
+        font-weight: 600;
+    }
+    .table th {
+        background-color: #f8f9fa;
+    }
+    
+    /* Darker footer colors */
+    .bg-primary-dark {
+        background-color: #0043a8;
+    }
+    .bg-success-dark {
+        background-color: #00663b;
+    }
+    .bg-warning-dark {
+        background-color: #cc9600;
+    }
+    .bg-info-dark {
+        background-color: #0097a7;
+    }
+    
+    /* Darker card colors */
+    .bg-primary {
+        background-color: #0d6efd !important;
+    }
+    .bg-success {
+        background-color: #198754 !important;
+    }
+    .bg-warning {
+        background-color: #ffc107 !important;
+    }
+    .bg-info {
+        background-color: #0dcaf0 !important;
+    }
+    
+    /* Material summary styling */
+    .accordion-button:not(.collapsed) {
+        background-color: #f0f8ff;
+        color: #0d6efd;
+    }
+    .accordion-button:focus {
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+</style>
+{% endblock %}
+
+{% block sidebar %}
+    <li class="nav-item">
+        <a class="nav-link active" href="{% url 'operations_dashboard' %}">
+            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'feeding' %}">
+            <i class="fas fa-arrow-right me-2"></i>Feeding
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'reclaiming' %}">
+            <i class="fas fa-recycle me-2"></i>Reclaiming
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'crushing' %}">
+            <i class="fas fa-hammer me-2"></i>Crushing
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'receiving' %}">
+            <i class="fas fa-truck-loading me-2"></i>Receiving
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'daily_summary' %}">
+            <i class="fas fa-chart-bar me-2"></i>Daily Summary
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Operations Dashboard</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <form method="get" class="d-flex">
+                <input type="date" name="date" class="form-control me-2" value="{{ selected_date|date:'Y-m-d' }}">
+                <select name="area" class="form-select me-2">
+                    <option value="">All Areas</option>
+                    {% for area in areas %}
+                        <option value="{{ area.id }}" {% if selected_area.id == area.id %}selected{% endif %}>{{ area|format_area_name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="shift" class="form-select me-2">
+                    <option value="">All Shifts</option>
+                    {% for shift in shifts %}
+                        <option value="{{ shift.name }}" {% if selected_shift == shift.name %}selected{% endif %}>{{ shift.get_name_display }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Filter</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card dashboard-card summary-card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-arrow-right me-2"></i>Feeding</h5>
+                    <p class="card-text display-6">
+                        {{ feeding_data.count }}
+                    </p>
+                    <p class="card-text">
+                        Total: <strong>{{ feeding_total|floatformat:2 }} tons</strong>
+                    </p>
+                </div>
+                <div class="card-footer bg-primary-dark text-white py-2">
+                    <a href="{% url 'feeding' %}" class="text-white text-decoration-none small">View Details <i class="fas fa-chevron-right ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card dashboard-card summary-card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-recycle me-2"></i>Reclaiming</h5>
+                    <p class="card-text display-6">
+                        {{ reclaiming_data.count }}
+                    </p>
+                    <p class="card-text">
+                        Total: <strong>{{ reclaiming_total|floatformat:2 }} tons</strong>
+                    </p>
+                </div>
+                <div class="card-footer bg-success-dark text-white py-2">
+                    <a href="{% url 'reclaiming' %}" class="text-white text-decoration-none small">View Details <i class="fas fa-chevron-right ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card dashboard-card summary-card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-hammer me-2"></i>Crushing</h5>
+                    <p class="card-text display-6">
+                        {{ crushing_data.count }}
+                    </p>
+                    <p class="card-text">
+                        Total: <strong>{{ crushing_total|floatformat:2 }} tons</strong>
+                    </p>
+                </div>
+                <div class="card-footer bg-warning-dark text-dark py-2">
+                    <a href="{% url 'crushing' %}" class="text-dark text-decoration-none small">View Details <i class="fas fa-chevron-right ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card dashboard-card summary-card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-truck-loading me-2"></i>Receiving</h5>
+                    <p class="card-text display-6">
+                        {{ receiving_data.count }}
+                    </p>
+                    <p class="card-text">
+                        Total: <strong>{{ receiving_total|floatformat:2 }} tons</strong>
+                    </p>
+                </div>
+                <div class="card-footer bg-info-dark text-white py-2">
+                    <a href="{% url 'receiving' %}" class="text-white text-decoration-none small">View Details <i class="fas fa-chevron-right ms-1"></i></a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Material Summary Chart -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">Material Summary</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="materialChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Material Summary by Type -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">Material Summary by Type</h5>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="materialTypeAccordion">
+                        {% for type_name, materials in materials_by_type.items %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ forloop.counter }}">
+                                    <strong>{{ type_name }}</strong> ({{ materials|length }} materials)
+                                </button>
+                            </h2>
+                            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#materialTypeAccordion">
+                                <div class="accordion-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 30%;">Material</th>
+                                                    <th style="width: 15%;" class="text-center">Feeding</th>
+                                                    <th style="width: 15%;" class="text-center">Reclaiming</th>
+                                                    <th style="width: 15%;" class="text-center">Crushing</th>
+                                                    <th style="width: 15%;" class="text-center">Receiving</th>
+                                                    <th style="width: 10%;" class="text-center">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for material in materials %}
+                                                <tr>
+                                                    <td><strong>{{ material.name }}</strong></td>
+                                                    <td class="text-center">
+                                                        {% for item in feeding_summary %}
+                                                            {% if item.material__name == material.name %}
+                                                                {{ item.total|floatformat:2 }} tons
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </td>
+                                                    <td class="text-center">
+                                                        {% for item in reclaiming_summary %}
+                                                            {% if item.material__name == material.name %}
+                                                                {{ item.total|floatformat:2 }} tons
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </td>
+                                                    <td class="text-center">
+                                                        {% for item in crushing_summary %}
+                                                            {% if item.material__name == material.name %}
+                                                                {{ item.total|floatformat:2 }} tons
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </td>
+                                                    <td class="text-center">
+                                                        {% for item in receiving_summary %}
+                                                            {% if item.material__name == material.name %}
+                                                                {{ item.total|floatformat:2 }} tons
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </td>
+                                                    <td class="text-center fw-bold">
+                                                        {% if material.total > 0 %}
+                                                            {{ material.total|floatformat:2 }} tons
+                                                        {% else %}
+                                                            -
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activities Section -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">Recent Activities</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs" id="activityTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab" aria-controls="all" aria-selected="true">All</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="feeding-tab" data-bs-toggle="tab" data-bs-target="#feeding" type="button" role="tab" aria-controls="feeding" aria-selected="false">Feeding</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="reclaiming-tab" data-bs-toggle="tab" data-bs-target="#reclaiming" type="button" role="tab" aria-controls="reclaiming" aria-selected="false">Reclaiming</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="crushing-tab" data-bs-toggle="tab" data-bs-target="#crushing" type="button" role="tab" aria-controls="crushing" aria-selected="false">Crushing</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="receiving-tab" data-bs-toggle="tab" data-bs-target="#receiving" type="button" role="tab" aria-controls="receiving" aria-selected="false">Receiving</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="activityTabsContent">
+                        <!-- All Activities Tab -->
+                        <div class="tab-pane fade show active" id="all" role="tabpanel" aria-labelledby="all-tab">
+                            <div class="table-responsive mt-3">
+                                <table class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Operation</th>
+                                            <th>Material</th>
+                                            <th>Quantity</th>
+                                            <th>Area</th>
+                                            <th>Shift</th>
+                                            <th>Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for entry in recent_feeding %}
+                                        <tr>
+                                            <td><span class="badge bg-primary">Feeding</span></td>
+                                            <td>{{ entry.material.name }}</td>
+                                            <td>{{ entry.quantity }} tons</td>
+                                            <td>{{ entry.area.name }}</td>
+                                            <td>{{ entry.shift.name }}</td>
+                                            <td>{{ entry.timestamp|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for entry in recent_reclaiming %}
+                                        <tr>
+                                            <td><span class="badge bg-success">Reclaiming</span></td>
+                                            <td>{{ entry.material.name }}</td>
+                                            <td>{{ entry.quantity }} tons</td>
+                                            <td>{{ entry.area.name }}</td>
+                                            <td>{{ entry.shift.name }}</td>
+                                            <td>{{ entry.timestamp|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for entry in recent_crushing %}
+                                        <tr>
+                                            <td><span class="badge bg-warning">Crushing</span></td>
+                                            <td>{{ entry.material.name }}</td>
+                                            <td>{{ entry.quantity }} tons</td>
+                                            <td>{{ entry.area.name }}</td>
+                                            <td>{{ entry.shift.name }}</td>
+                                            <td>{{ entry.timestamp|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% for entry in recent_receiving %}
+                                        <tr>
+                                            <td><span class="badge bg-info">Receiving</span></td>
+                                            <td>{{ entry.material.name }}</td>
+                                            <td>{{ entry.quantity }} tons</td>
+                                            <td>{{ entry.area.name }}</td>
+                                            <td>{{ entry.shift.name }}</td>
+                                            <td>{{ entry.timestamp|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Feeding Tab -->
+                        <div class="tab-pane fade" id="feeding" role="tabpanel" aria-labelledby="feeding-tab">
+                            <div class="table-responsive mt-3">
+                                <table class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Quantity</th>
+                                            <th>Destination</th>
+                                            <th>Area</th>
+                                            <th>Shift</th>
+                                            <th>Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for entry in recent_feeding %}
+                                        <tr>
+                                            <td>{{ entry.material.name }}</td>
+                                            <td>{{ entry.quantity }} tons</td>
+                                            <td>{{ entry.destination }}</td>
+                                            <td>{{ entry.area.name }}</td>
+                                            <td>{{ entry.shift.name }}</td>
+                                            <td>{{ entry.timestamp|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="6" class="text-center">No recent feeding activities</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Reclaiming Tab -->
+                        <div class="tab-pane fade" id="reclaiming" role="tabpanel" aria-labelledby="reclaiming-tab">
+                            <div class="table-responsive mt-3">
+                                <table class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Quantity</th>
+                                            <th>Source</th>
+                                            <th>Area</th>
+                                            <th>Shift</th>
+                                            <th>Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for entry in recent_reclaiming %}
+                                        <tr>
+                                            <td>{{ entry.material.name }}</td>
+                                            <td>{{ entry.quantity }} tons</td>
+                                            <td>{{ entry.source }}</td>
+                                            <td>{{ entry.area.name }}</td>
+                                            <td>{{ entry.shift.name }}</td>
+                                            <td>{{ entry.timestamp|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="6" class="text-center">No recent reclaiming activities</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Crushing Tab -->
+                        <div class="tab-pane fade" id="crushing" role="tabpanel" aria-labelledby="crushing-tab">
+                            <div class="table-responsive mt-3">
+                                <table class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Quantity</th>
+                                            <th>Crusher</th>
+                                            <th>Area</th>
+                                            <th>Shift</th>
+                                            <th>Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for entry in recent_crushing %}
+                                        <tr>
+                                            <td>{{ entry.material.name }}</td>
+                                            <td>{{ entry.quantity }} tons</td>
+                                            <td>{{ entry.crusher }}</td>
+                                            <td>{{ entry.area.name }}</td>
+                                            <td>{{ entry.shift.name }}</td>
+                                            <td>{{ entry.timestamp|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="6" class="text-center">No recent crushing activities</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Receiving Tab -->
+                        <div class="tab-pane fade" id="receiving" role="tabpanel" aria-labelledby="receiving-tab">
+                            <div class="table-responsive mt-3">
+                                <table class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Quantity</th>
+                                            <th>Source</th>
+                                            <th>Area</th>
+                                            <th>Shift</th>
+                                            <th>Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for entry in recent_receiving %}
+                                        <tr>
+                                            <td>{{ entry.material.name }}</td>
+                                            <td>{{ entry.quantity }} tons</td>
+                                            <td>{{ entry.source }}</td>
+                                            <td>{{ entry.area.name }}</td>
+                                            <td>{{ entry.shift.name }}</td>
+                                            <td>{{ entry.timestamp|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="6" class="text-center">No recent receiving activities</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Material Chart
+    var ctx = document.getElementById('materialChart').getContext('2d');
+    
+    // Prepare data for chart
+    var materialLabels = [];
+    var feedingData = [];
+    var reclaimingData = [];
+    var crushingData = [];
+    var receivingData = [];
+    
+    {% for item in feeding_summary %}
+        materialLabels.push('{{ item.material__name }}');
+        feedingData.push({{ item.total|default:0 }});
+    {% endfor %}
+    
+    {% for item in reclaiming_summary %}
+        // Check if this material is already in the labels
+        var materialIndex = materialLabels.indexOf('{{ item.material__name }}');
+        if (materialIndex === -1) {
+            materialLabels.push('{{ item.material__name }}');
+            feedingData.push(0);
+            materialIndex = materialLabels.length - 1;
+        }
+        reclaimingData[materialIndex] = {{ item.total|default:0 }};
+    {% endfor %}
+    
+    // Fill in missing reclaiming data with zeros
+    for (var i = 0; i < materialLabels.length; i++) {
+        if (reclaimingData[i] === undefined) {
+            reclaimingData[i] = 0;
+        }
+    }
+    
+    {% for item in crushing_summary %}
+        // Check if this material is already in the labels
+        var materialIndex = materialLabels.indexOf('{{ item.material__name }}');
+        if (materialIndex === -1) {
+            materialLabels.push('{{ item.material__name }}');
+            feedingData.push(0);
+            reclaimingData.push(0);
+            materialIndex = materialLabels.length - 1;
+        }
+        crushingData[materialIndex] = {{ item.total|default:0 }};
+    {% endfor %}
+    
+    // Fill in missing crushing data with zeros
+    for (var i = 0; i < materialLabels.length; i++) {
+        if (crushingData[i] === undefined) {
+            crushingData[i] = 0;
+        }
+    }
+    
+    {% for item in receiving_summary %}
+        // Check if this material is already in the labels
+        var materialIndex = materialLabels.indexOf('{{ item.material__name }}');
+        if (materialIndex === -1) {
+            materialLabels.push('{{ item.material__name }}');
+            feedingData.push(0);
+            reclaimingData.push(0);
+            crushingData.push(0);
+            materialIndex = materialLabels.length - 1;
+        }
+        receivingData[materialIndex] = {{ item.total|default:0 }};
+    {% endfor %}
+    
+    // Fill in missing receiving data with zeros
+    for (var i = 0; i < materialLabels.length; i++) {
+        if (receivingData[i] === undefined) {
+            receivingData[i] = 0;
+        }
+    }
+    
+    var materialChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: materialLabels,
+            datasets: [
+                {
+                    label: 'Feeding',
+                    data: feedingData,
+                    backgroundColor: 'rgba(0, 83, 214, 0.8)',
+                    borderColor: 'rgba(0, 83, 214, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Reclaiming',
+                    data: reclaimingData,
+                    backgroundColor: 'rgba(0, 128, 93, 0.8)',
+                    borderColor: 'rgba(0, 128, 93, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Crushing',
+                    data: crushingData,
+                    backgroundColor: 'rgba(214, 158, 0, 0.8)',
+                    borderColor: 'rgba(214, 158, 0, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Receiving',
+                    data: receivingData,
+                    backgroundColor: 'rgba(214, 41, 62, 0.8)',
+                    borderColor: 'rgba(214, 41, 62, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Quantity (tons)',
+                        font: {
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Materials',
+                        font: {
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Material Summary for {{ selected_date|date:"F d, Y" }}',
+                    font: {
+                        size: 16,
+                        weight: 'bold'
+                    },
+                    padding: {
+                        top: 10,
+                        bottom: 20
+                    }
+                },
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            weight: 'bold'
+                        },
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleFont: {
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        weight: 'normal'
+                    },
+                    padding: 10,
+                    cornerRadius: 4,
+                    displayColors: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %} 

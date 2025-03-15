@@ -1,0 +1,356 @@
+{% extends 'base.html' %}
+
+{% block title %}Maintenance Dashboard - RMHS{% endblock %}
+
+{% block sidebar %}
+    <li class="nav-item">
+        <a class="nav-link active" href="{% url 'maintenance_dashboard' %}">
+            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'electrical_issues' %}">
+            <i class="fas fa-bolt me-2"></i>Electrical Issues
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'mechanical_issues' %}">
+            <i class="fas fa-cogs me-2"></i>Mechanical Issues
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'planned_maintenance' %}">
+            <i class="fas fa-calendar-alt me-2"></i>Planned Maintenance
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'rake_entry' %}">
+            <i class="fas fa-train me-2"></i>Rake Handling
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Maintenance Dashboard</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <form method="get" class="d-flex">
+                <input type="date" name="date" class="form-control me-2" value="{{ selected_date|date:'Y-m-d' }}">
+                <select name="area" class="form-select me-2">
+                    <option value="">All Areas</option>
+                    {% for area in areas %}
+                        <option value="{{ area.id }}" {% if selected_area.id == area.id %}selected{% endif %}>{{ area.name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="category" class="form-select me-2">
+                    <option value="">All Categories</option>
+                    <option value="ELECTRICAL" {% if category == 'ELECTRICAL' %}selected{% endif %}>Electrical</option>
+                    <option value="MECHANICAL" {% if category == 'MECHANICAL' %}selected{% endif %}>Mechanical</option>
+                </select>
+                <button type="submit" class="btn btn-primary">Filter</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card dashboard-card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Electrical Issues</h5>
+                    <p class="card-text display-6">
+                        {{ electrical_issues_count }}
+                    </p>
+                    <p class="card-text">
+                        Resolved: {{ resolved_issues_count }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card dashboard-card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">Mechanical Issues</h5>
+                    <p class="card-text display-6">
+                        {{ mechanical_issues_count }}
+                    </p>
+                    <p class="card-text">
+                        Unresolved: {{ unresolved_issues_count }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card dashboard-card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Planned Maintenance</h5>
+                    <p class="card-text display-6">
+                        {{ planned_data.count }}
+                    </p>
+                    <p class="card-text">
+                        Completed: {{ planned_completed_count }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card dashboard-card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">In Progress</h5>
+                    <p class="card-text display-6">
+                        {{ planned_in_progress_count }}
+                    </p>
+                    <p class="card-text">
+                        Pending: {{ planned_pending_count }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Issues Summary Chart -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">Issues Summary</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="issuesChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Issues -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">Recent Electrical Issues</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Issue Type</th>
+                                    <th>Area</th>
+                                    <th>Reported By</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in issues_data|slice:":5" %}
+                                    {% if item.issue_type.category == 'ELECTRICAL' %}
+                                        <tr>
+                                            <td>{{ item.issue_type.name }}</td>
+                                            <td>{{ item.area.name }}</td>
+                                            <td>{{ item.reported_by }}</td>
+                                            <td>
+                                                {% if item.resolved %}
+                                                    <span class="badge bg-success">Resolved</span>
+                                                {% else %}
+                                                    <span class="badge bg-danger">Unresolved</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center">No electrical issues found</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">Recent Mechanical Issues</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Issue Type</th>
+                                    <th>Area</th>
+                                    <th>Reported By</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in issues_data|slice:":5" %}
+                                    {% if item.issue_type.category == 'MECHANICAL' %}
+                                        <tr>
+                                            <td>{{ item.issue_type.name }}</td>
+                                            <td>{{ item.area.name }}</td>
+                                            <td>{{ item.reported_by }}</td>
+                                            <td>
+                                                {% if item.resolved %}
+                                                    <span class="badge bg-success">Resolved</span>
+                                                {% else %}
+                                                    <span class="badge bg-danger">Unresolved</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center">No mechanical issues found</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Export Buttons -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Export Options</h5>
+                    <div class="btn-group">
+                        <div class="dropdown me-2">
+                            <button class="btn btn-success dropdown-toggle" type="button" id="jsonExportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-file-code me-2"></i>Export as JSON
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="jsonExportDropdown">
+                                <li><a class="dropdown-item" href="#" onclick="exportData('electrical_issues', 'json')">Electrical Issues</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportData('mechanical_issues', 'json')">Mechanical Issues</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportData('planned_maintenance', 'json')">Planned Maintenance</a></li>
+                            </ul>
+                        </div>
+                        <div class="dropdown me-2">
+                            <button class="btn btn-primary dropdown-toggle" type="button" id="xlsxExportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-file-excel me-2"></i>Export as Excel
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="xlsxExportDropdown">
+                                <li><a class="dropdown-item" href="#" onclick="exportData('electrical_issues', 'xlsx')">Electrical Issues</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportData('mechanical_issues', 'xlsx')">Mechanical Issues</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportData('planned_maintenance', 'xlsx')">Planned Maintenance</a></li>
+                            </ul>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-danger dropdown-toggle" type="button" id="pdfExportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-file-pdf me-2"></i>Export as PDF
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="pdfExportDropdown">
+                                <li><a class="dropdown-item" href="#" onclick="exportData('electrical_issues', 'pdf')">Electrical Issues</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportData('mechanical_issues', 'pdf')">Mechanical Issues</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportData('planned_maintenance', 'pdf')">Planned Maintenance</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Issues Chart
+    var ctx = document.getElementById('issuesChart').getContext('2d');
+    var issuesChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Electrical Issues', 'Mechanical Issues', 'Resolved Issues', 'Unresolved Issues'],
+            datasets: [{
+                data: [
+                    {{ electrical_issues_count }},
+                    {{ mechanical_issues_count }},
+                    {{ resolved_issues_count }},
+                    {{ unresolved_issues_count }}
+                ],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.5)',
+                    'rgba(255, 206, 86, 0.5)',
+                    'rgba(75, 192, 192, 0.5)',
+                    'rgba(153, 102, 255, 0.5)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'Issues Summary for {{ selected_date }}'
+                }
+            }
+        }
+    });
+
+    function exportData(dataType, format) {
+        // Get current filter values
+        const date = document.querySelector('input[name="date"]').value;
+        const area = document.querySelector('select[name="area"]').value;
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('date', date);
+        if (area) formData.append('area', area);
+        formData.append('data_type', dataType);
+        formData.append('format', format);  // Add format parameter
+        
+        // Send AJAX request
+        fetch('{% url "export_maintenance_data" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(function(response) {
+            if (format === 'json') {
+                return response.json().then(function(data) {
+                    // Create a downloadable file for JSON
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `maintenance_${dataType}_${date}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+            } else {
+                // For XLSX and PDF, trigger download directly
+                return response.blob().then(function(blob) {
+                    // Create URL directly from the blob returned by the server
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `maintenance_${dataType}_${date}.${format}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url); // Clean up
+                });
+            }
+        })
+        .catch(function(error) {
+            console.error('Error exporting data as ' + format + ':', error);
+        });
+    }
+</script>
+{% endblock %} 

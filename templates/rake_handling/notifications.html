@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}Rake Notifications - RMHS{% endblock %}
+
+{% block sidebar %}
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'rake_dashboard' %}">
+            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'rake_entry' %}">
+            <i class="fas fa-train me-2"></i>Rake Entry
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{% url 'rake_notifications' %}">
+            <i class="fas fa-bell me-2"></i>Notifications
+            <span class="badge bg-danger">{{ unread_count }}</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'maintenance_dashboard' %}">
+            <i class="fas fa-tools me-2"></i>Maintenance
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Rake Notifications</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="markAllRead">
+                <i class="fas fa-check-double me-1"></i>Mark All as Read
+            </button>
+        </div>
+    </div>
+
+    <!-- Notifications List -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">All Notifications</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for notification in notifications %}
+                            <div class="list-group-item list-group-item-action {% if not notification.read %}list-group-item-warning{% endif %}" id="notification-{{ notification.id }}">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">{{ notification.message }}</h5>
+                                    <small>{{ notification.timestamp|timesince }} ago</small>
+                                </div>
+                                <p class="mb-1">Status: 
+                                    {% if notification.status == 'COMPLETED' %}
+                                        <span class="badge bg-success">Completed</span>
+                                    {% elif notification.status == 'IN_PROGRESS' %}
+                                        <span class="badge bg-warning text-dark">In Progress</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Pending</span>
+                                    {% endif %}
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small>Rake ID: {{ notification.rake_entry.rake_id }}</small>
+                                    {% if not notification.read %}
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="markAsRead({{ notification.id }})">
+                                            <i class="fas fa-check me-1"></i>Mark as Read
+                                        </button>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Read</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="list-group-item">
+                                <p class="mb-0 text-center">No notifications found</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Function to mark a notification as read
+    function markAsRead(notificationId) {
+        // Create form data
+        const formData = new FormData();
+        
+        // Send AJAX request
+        fetch(`{% url 'mark_notification_read' 0 %}`.replace('0', notificationId), {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Update UI
+                const notification = document.getElementById(`notification-${notificationId}`);
+                notification.classList.remove('list-group-item-warning');
+                
+                // Replace button with read badge
+                const buttonContainer = notification.querySelector('.btn').parentNode;
+                buttonContainer.innerHTML = '<span class="badge bg-secondary">Read</span>';
+                
+                // Update unread count
+                const badge = document.querySelector('.nav-link.active .badge');
+                let count = parseInt(badge.textContent);
+                badge.textContent = Math.max(0, count - 1);
+                
+                if (count <= 1) {
+                    badge.style.display = 'none';
+                }
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => console.error('Error marking notification as read:', error));
+    }
+    
+    // Function to mark all notifications as read
+    document.getElementById('markAllRead').addEventListener('click', function() {
+        // Get all unread notifications
+        const unreadNotifications = document.querySelectorAll('.list-group-item-warning');
+        
+        // If no unread notifications, do nothing
+        if (unreadNotifications.length === 0) {
+            return;
+        }
+        
+        // Confirm action
+        if (!confirm('Mark all notifications as read?')) {
+            return;
+        }
+        
+        // Mark each notification as read
+        unreadNotifications.forEach(notification => {
+            const notificationId = notification.id.replace('notification-', '');
+            markAsRead(notificationId);
+        });
+    });
+</script>
+{% endblock %} 

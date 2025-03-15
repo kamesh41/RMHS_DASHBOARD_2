@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RMHS Dashboard{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <style>
+        body {
+            padding-top: 56px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar {
+            min-height: calc(100vh - 56px);
+            background-color: #343a40;
+            color: white;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.75);
+        }
+        .sidebar .nav-link:hover {
+            color: rgba(255, 255, 255, 1);
+        }
+        .sidebar .nav-link.active {
+            color: white;
+            font-weight: bold;
+        }
+        .main-content {
+            flex: 1;
+            padding: 20px;
+        }
+        .dashboard-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+        }
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            font-size: 0.7rem;
+        }
+        /* Hide area fields and labels when in rake handling pages */
+        body.rake-handling label[for="area"], 
+        body.rake-handling select#area,
+        body.rake-handling div.area-container,
+        body.rake-handling .area-field {
+            display: none !important;
+        }
+        
+        /* Hide shift fields when in rake entry page */
+        body.rake-entry label[for="shift"], 
+        body.rake-entry select#shift,
+        body.rake-entry div.shift-container,
+        body.rake-entry .shift-field {
+            display: none !important;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'operations_dashboard' %}">RMHS Dashboard</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'operations' in request.path %}active{% endif %}" href="{% url 'operations_dashboard' %}">Operations</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'maintenance' in request.path %}active{% endif %}" href="{% url 'maintenance_dashboard' %}">Maintenance</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'rake_handling' in request.path %}active{% endif %}" href="{% url 'rake_dashboard' %}">Rake Handling</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'rake_notifications' %}">
+                            <i class="fas fa-bell"></i>
+                            <span id="notification-count" class="badge bg-danger notification-badge">0</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        {% block sidebar %}{% endblock %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+                <!-- Messages -->
+                {% if messages %}
+                    <div class="messages mt-3">
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <!-- Page content -->
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom JS -->
+    <script>
+        // Function to update notification count
+        function updateNotificationCount() {
+            $.ajax({
+                url: "{% url 'rake_notifications' %}",
+                type: "GET",
+                dataType: "json",
+                success: function(data) {
+                    $("#notification-count").text(data.unread_count);
+                    if (data.unread_count > 0) {
+                        $("#notification-count").show();
+                    } else {
+                        $("#notification-count").hide();
+                    }
+                }
+            });
+        }
+
+        // Update notification count on page load
+        $(document).ready(function() {
+            updateNotificationCount();
+            
+            // Update notification count every 30 seconds
+            setInterval(updateNotificationCount, 30000);
+        });
+
+        // Add body classes based on current URL
+        document.addEventListener('DOMContentLoaded', function() {
+            const path = window.location.pathname;
+            if (path.startsWith('/rake_handling/')) {
+                document.body.classList.add('rake-handling');
+                if (path === '/rake_handling/rake_entry/' || path === '/rake_handling/rake_entry') {
+                    document.body.classList.add('rake-entry');
+                }
+            }
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

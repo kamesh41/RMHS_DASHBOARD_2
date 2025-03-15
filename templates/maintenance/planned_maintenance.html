@@ -1,0 +1,337 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Planned Maintenance{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <h2 class="mb-4">Planned Maintenance</h2>
+    
+    <!-- Date Filter and Controls -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="date" class="form-label">Date</label>
+                    <input type="date" class="form-control" id="date" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="area" class="form-label">Area</label>
+                    <select class="form-select" id="area" name="area">
+                        <option value="">All Areas</option>
+                        {% for area_item in areas %}
+                        <option value="{{ area_item.id }}" {% if selected_area.id == area_item.id %}selected{% endif %}>{{ area_item.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Add Planned Maintenance Form -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Schedule Planned Maintenance</h5>
+        </div>
+        <div class="card-body">
+            <form id="plannedMaintenanceForm" method="post" action="{% url 'planned_maintenance' %}">
+                {% csrf_token %}
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="title" class="form-label">Title *</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="category" class="form-label">Category *</label>
+                        <select class="form-select" id="category" name="category" required>
+                            <option value="">Select Category</option>
+                            <option value="ELECTRICAL">Electrical</option>
+                            <option value="MECHANICAL">Mechanical</option>
+                            <option value="GENERAL">General</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="area" class="form-label">Area *</label>
+                        <select class="form-select" id="area_select" name="area" required>
+                            <option value="">Select Area</option>
+                            {% for area_item in areas %}
+                            <option value="{{ area_item.id }}">{{ area_item.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="planned_date" class="form-label">Planned Date *</label>
+                        <input type="date" class="form-control" id="planned_date" name="planned_date" required>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="start_time" class="form-label">Start Time *</label>
+                        <input type="time" class="form-control" id="start_time" name="start_time" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="end_time" class="form-label">End Time *</label>
+                        <input type="time" class="form-control" id="end_time" name="end_time" required>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="assigned_to" class="form-label">Assigned To *</label>
+                        <input type="text" class="form-control" id="assigned_to" name="assigned_to" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="status" class="form-label">Status *</label>
+                        <select class="form-select" id="status" name="status" required>
+                            <option value="SCHEDULED">Scheduled</option>
+                            <option value="IN_PROGRESS">In Progress</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="CANCELLED">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description *</label>
+                    <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+                </div>
+                
+                <div class="text-end">
+                    <button type="submit" class="btn btn-primary">Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Planned Maintenance Table -->
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Planned Maintenance</h5>
+            <div>
+                <button class="btn btn-sm btn-light" onclick="exportTableToCSV('planned_maintenance.csv')">
+                    <i class="bi bi-download"></i> Export Table
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered" id="plannedMaintenanceTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Category</th>
+                            <th>Area</th>
+                            <th>Planned Date</th>
+                            <th>Time</th>
+                            <th>Assigned To</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if planned_maintenance %}
+                            {% for maintenance in planned_maintenance %}
+                            <tr>
+                                <td>{{ maintenance.id }}</td>
+                                <td>{{ maintenance.title }}</td>
+                                <td>{{ maintenance.get_category_display }}</td>
+                                <td>{{ maintenance.area.name }}</td>
+                                <td>{{ maintenance.planned_date|date:"Y-m-d" }}</td>
+                                <td>{{ maintenance.start_time|time:"H:i" }} - {{ maintenance.end_time|time:"H:i" }}</td>
+                                <td>{{ maintenance.assigned_to }}</td>
+                                <td>
+                                    <span class="badge {% if maintenance.status == 'COMPLETED' %}bg-success{% elif maintenance.status == 'IN_PROGRESS' %}bg-warning{% elif maintenance.status == 'CANCELLED' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                        {{ maintenance.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary update-status-btn" data-maintenance-id="{{ maintenance.id }}" data-bs-toggle="modal" data-bs-target="#statusModal">
+                                        Update Status
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center">No planned maintenance found</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Update Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusModalLabel">Update Maintenance Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="statusUpdateForm">
+                    <input type="hidden" id="modal_maintenance_id" name="maintenance_id">
+                    <div class="mb-3">
+                        <label for="modal_status" class="form-label">Status</label>
+                        <select class="form-select" id="modal_status" name="status" required>
+                            <option value="SCHEDULED">Scheduled</option>
+                            <option value="IN_PROGRESS">In Progress</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="CANCELLED">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modal_notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="modal_notes" name="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="updateStatusBtn">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set default date for planned maintenance
+        const plannedDateInput = document.getElementById('planned_date');
+        if (plannedDateInput && !plannedDateInput.value) {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            plannedDateInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+        
+        // Set up status update buttons
+        const updateStatusBtns = document.querySelectorAll('.update-status-btn');
+        updateStatusBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const maintenanceId = this.getAttribute('data-maintenance-id');
+                document.getElementById('modal_maintenance_id').value = maintenanceId;
+            });
+        });
+        
+        // Set up status update submission
+        const updateStatusBtn = document.getElementById('updateStatusBtn');
+        if (updateStatusBtn) {
+            updateStatusBtn.addEventListener('click', function() {
+                updateMaintenanceStatus();
+            });
+        }
+    });
+    
+    // Function to update maintenance status
+    function updateMaintenanceStatus() {
+        const maintenanceId = document.getElementById('modal_maintenance_id').value;
+        const status = document.getElementById('modal_status').value;
+        const notes = document.getElementById('modal_notes').value;
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('status', status);
+        formData.append('notes', notes);
+        
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Send request
+        fetch(`/maintenance/update_planned_status/${maintenanceId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Server returned ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+                modal.hide();
+                
+                // Reload page to show updated data
+                location.reload();
+            } else {
+                alert('Error updating status: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error updating status:', error);
+            alert('Error updating status: ' + error.message);
+        });
+    }
+    
+    // Function to export table to CSV
+    function exportTableToCSV(filename) {
+        const table = document.getElementById('plannedMaintenanceTable');
+        let csv = [];
+        const rows = table.querySelectorAll('tr');
+        
+        for (let i = 0; i < rows.length; i++) {
+            const row = [], cols = rows[i].querySelectorAll('td, th');
+            
+            for (let j = 0; j < cols.length; j++) {
+                // Get the text content and clean it
+                let data = cols[j].textContent.trim();
+                // Remove any commas to avoid CSV issues
+                data = data.replace(/,/g, ' ');
+                // Remove any quotes to avoid CSV issues
+                data = data.replace(/"/g, '""');
+                // Add quotes around the data
+                row.push('"' + data + '"');
+            }
+            
+            csv.push(row.join(','));
+        }
+        
+        // Download CSV file
+        downloadCSV(csv.join('\n'), filename);
+    }
+    
+    function downloadCSV(csv, filename) {
+        const csvFile = new Blob([csv], {type: 'text/csv'});
+        const downloadLink = document.createElement('a');
+        
+        // Set file name
+        downloadLink.download = filename;
+        
+        // Create a link to the file
+        downloadLink.href = window.URL.createObjectURL(csvFile);
+        
+        // Hide download link
+        downloadLink.style.display = 'none';
+        
+        // Add the link to DOM
+        document.body.appendChild(downloadLink);
+        
+        // Click download link
+        downloadLink.click();
+        
+        // Clean up and remove the link
+        document.body.removeChild(downloadLink);
+    }
+</script>
+{% endblock %} 
